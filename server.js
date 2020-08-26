@@ -20,12 +20,15 @@ const userSchema = new Schema({
 
 const User = mongoose.model("users", userSchema);
 
-const addUserToDataBase = async (userToCreate) => {
-  return User.create({ username: userToCreate.username, count: 0, log: [] });
+const addUserToDataBase = async (userToCreate) =>
+  User.create({ username: userToCreate.username, count: 0, log: [] });
+
+const allUsersNamesAndIds = async () => {
+  return User.find({}).select("_id username");
 };
 
-const allUsersNamesAndIds = () => {
-  return User.find({}).select("_id username");
+const findUserById = async (id) => {
+  return User.findById(id).select("_id username count log");
 };
 
 app.use(cors());
@@ -40,13 +43,30 @@ app.get("/", (req, res) => {
 
 //POST /api/exercise/new-user
 app.post("/api/exercise/new-user", async (req, res, next) => {
-  const { _id, username } = await addUserToDataBase(req.body);
-  res.json({ _id, username });
+  try {
+    const { _id, username } = await addUserToDataBase(req.body);
+    res.status(201).json({ _id, username });
+  } catch (error) {
+    next(error);
+  }
 });
 
 //Get an array of all users
 app.get("/api/exercise/users", async (req, res, next) => {
-  res.json(await allUsersNamesAndIds());
+  try {
+    res.json(await allUsersNamesAndIds());
+  } catch (error) {
+    next(error);
+  }
+});
+
+//Get a specific user and its log + count
+app.get("/api/exercise/log", async (req, res, next) => {
+  try {
+    res.json(await findUserById(req.query.userId));
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Not found middleware
