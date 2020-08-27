@@ -15,13 +15,28 @@ const Schema = mongoose.Schema;
 const userSchema = new Schema({
   username: { type: String, required: true },
   count: { type: Number },
-  log: { type: Array },
+  log: { type: [Object] },
 });
 
 const User = mongoose.model("users", userSchema);
 
 const addUserToDataBase = async (userToCreate) =>
   User.create({ username: userToCreate.username, count: 0, log: [] });
+
+const addExerciseLogToUser = async (exerciseLog) => {
+  try {
+    const userToUpdate = await findUserById(exerciseLog.userId);
+    userToUpdate.log.push({
+      description: exerciseLog.description,
+      duration: exerciseLog.duration,
+      date: exerciseLog.date ? new Date(exerciseLog.date) : new Date(),
+    });
+    userToUpdate.count = userToUpdate.log.length;
+    return userToUpdate.save();
+  } catch (error) {
+    next(error);
+  }
+};
 
 const allUsersNamesAndIds = async () => {
   return User.find({}).select("_id username");
@@ -51,6 +66,15 @@ app.post("/api/exercise/new-user", async (req, res, next) => {
   }
 });
 
+//POST /api/exercise/add
+app.post("/api/exercise/add", async (req, res, next) => {
+  const { _id, username, log, count } = await addExerciseLogToUser(req.body);
+  log.forEach((exerciseLog) => {
+    exerciseLog.date = exerciseLog.date.toDateString();
+  });
+  res.json({ _id, username, log, count });
+});
+
 //Get an array of all users
 app.get("/api/exercise/users", async (req, res, next) => {
   try {
@@ -63,7 +87,11 @@ app.get("/api/exercise/users", async (req, res, next) => {
 //Get a specific user and its log + count
 app.get("/api/exercise/log", async (req, res, next) => {
   try {
-    res.json(await findUserById(req.query.userId));
+    const userToLog = await findUserById(req.query.userId);
+    userToLog.log.forEach((dateObj) => {
+      dateObj.date = dateObj.date.toDateString();
+    });
+    res.json(userToLog);
   } catch (error) {
     next(error);
   }
