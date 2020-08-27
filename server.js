@@ -31,6 +31,7 @@ const addExerciseLogToUser = async (exerciseLog) => {
       duration: exerciseLog.duration,
       date: exerciseLog.date ? new Date(exerciseLog.date) : new Date(),
     });
+    userToUpdate.log.sort((a, b) => a.date.getTime() - b.date.getTime());
     userToUpdate.count = userToUpdate.log.length;
     return userToUpdate.save();
   } catch (error) {
@@ -88,6 +89,21 @@ app.get("/api/exercise/users", async (req, res, next) => {
 app.get("/api/exercise/log", async (req, res, next) => {
   try {
     const userToLog = await findUserById(req.query.userId);
+    //[&from][&to][&limit]
+    const { from, to, limit } = req.query;
+    if (from) {
+      userToLog.log = userToLog.log.filter(
+        (eLog) => eLog.date > new Date(from).getTime()
+      );
+    }
+    if (to) {
+      userToLog.log = userToLog.log.filter(
+        (eLog) => eLog.date < new Date(to).getTime()
+      );
+    }
+    if (limit) {
+      userToLog.log = userToLog.log.slice(0, limit);
+    }
     userToLog.log.forEach((dateObj) => {
       dateObj.date = dateObj.date.toDateString();
     });
