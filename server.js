@@ -69,11 +69,15 @@ app.post("/api/exercise/new-user", async (req, res, next) => {
 
 //POST /api/exercise/add
 app.post("/api/exercise/add", async (req, res, next) => {
-  const { _id, username, log, count } = await addExerciseLogToUser(req.body);
-  log.forEach((exerciseLog) => {
-    exerciseLog.date = exerciseLog.date.toDateString();
+  const { _id, username } = await addExerciseLogToUser(req.body);
+  const { description, duration, date } = req.body;
+  res.json({
+    _id,
+    username,
+    description,
+    duration,
+    date: date || new Date().toDateString(),
   });
-  res.json({ _id, username, log, count });
 });
 
 //Get an array of all users
