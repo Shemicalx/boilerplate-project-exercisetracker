@@ -15,7 +15,13 @@ const Schema = mongoose.Schema;
 const userSchema = new Schema({
   username: { type: String, required: true },
   count: { type: Number },
-  log: { type: [Object] },
+  log: [
+    {
+      description: { type: String, required: true },
+      duration: { type: Number, required: true },
+      date: Number,
+    },
+  ],
 });
 
 const User = mongoose.model("users", userSchema);
@@ -23,27 +29,22 @@ const User = mongoose.model("users", userSchema);
 const addUserToDataBase = async (userToCreate) =>
   User.create({ username: userToCreate.username, count: 0, log: [] });
 
-const addExerciseLogToUser = async (exerciseLog) => {
-  try {
-    const userToUpdate = await findUserById(exerciseLog.userId);
-    userToUpdate.log.push({
-      description: exerciseLog.description,
-      duration: exerciseLog.duration,
-      date: exerciseLog.date ? new Date(exerciseLog.date) : new Date(),
-    });
-    userToUpdate.log.sort((a, b) => a.date.getTime() - b.date.getTime());
-    userToUpdate.count = userToUpdate.log.length;
-    return userToUpdate.save();
-  } catch (error) {
-    next(error);
-  }
+const addExerciseLogToUser = async (exerciseLog, userToUpdate) => {
+  userToUpdate.log.push({
+    description: exerciseLog.description,
+    duration: exerciseLog.duration,
+    date: exerciseLog.date ? Date.parse(exerciseLog.date) : Date.now(),
+  });
+  userToUpdate.log.sort((a, b) => a.date - b.date);
+  userToUpdate.count = userToUpdate.log.length;
+  return userToUpdate.save();
 };
 
 const allUsersNamesAndIds = async () => {
   return User.find({}).select("_id username");
 };
 
-const findUserById = async (id) => {
+const findUserById = (id) => {
   return User.findById(id).select("_id username count log");
 };
 
@@ -69,15 +70,25 @@ app.post("/api/exercise/new-user", async (req, res, next) => {
 
 //POST /api/exercise/add
 app.post("/api/exercise/add", async (req, res, next) => {
-  const { _id, username } = await addExerciseLogToUser(req.body);
-  const { description, duration, date } = req.body;
-  res.json({
-    _id,
-    username,
-    description,
-    duration,
-    date: date || new Date().toDateString(),
-  });
+  try {
+    if (!req.body.userId || !req.body.description || !req.body.duration) {
+      return res.send("Oi");
+    }
+    const { _id, username } = await addExerciseLogToUser(
+      req.body,
+      await findUserById(req.body.userId)
+    );
+    const { description, duration, date } = req.body;
+    res.json({
+      _id,
+      username,
+      date: new Date(Date.parse(date) || Date.now()).toDateString(),
+      duration: parseInt(duration),
+      description,
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 //Get an array of all users
@@ -92,7 +103,7 @@ app.get("/api/exercise/users", async (req, res, next) => {
 //Get a specific user and its log + count
 app.get("/api/exercise/log", async (req, res, next) => {
   try {
-    const userToLog = await findUserById(req.query.userId);
+    const userToLog = await findUserById(req.query.userId).lean();
     //[&from][&to][&limit]
     const { from, to, limit } = req.query;
     if (from) {
@@ -109,7 +120,7 @@ app.get("/api/exercise/log", async (req, res, next) => {
       userToLog.log = userToLog.log.slice(0, limit);
     }
     userToLog.log.forEach((dateObj) => {
-      dateObj.date = dateObj.date.toDateString();
+      dateObj.date = new Date(dateObj.date).toDateString();
     });
     res.json(userToLog);
   } catch (error) {
